@@ -172,13 +172,21 @@ class HttpRequest(object):
 class Request(URLRequest):
     """A request which contains a method attribute."""
     def __init__(self, url, body=b'', headers={}, method='PUT'):
+        def _cleanup_encoding(x):
+            # Support both Python 2 & 3 encodings
+            if six.PY3 and isinstance(x, bytes):
+                x = x.decode('utf-8')
+            elif six.PY2:
+                x = x.encode('utf-8')
+            return x
+
         normalized_headers = {
-            str(key): str(value)
+            _cleanup_encoding(key): _cleanup_encoding(value)
             for key, value in six.iteritems(headers)
         }
 
-        URLRequest.__init__(self, str(url), body, normalized_headers)
-        self.method = str(method)
+        URLRequest.__init__(self, _cleanup_encoding(url), body, normalized_headers)
+        self.method = _cleanup_encoding(method)
 
     def get_method(self):
         return self.method
@@ -423,6 +431,7 @@ class ReviewBoardServer(object):
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
                  verify_ssl=True, save_cookies=True, ext_auth_cookies=None):
+        assert isinstance(url, str)
         if not url.endswith('/'):
             url += '/'
 
@@ -565,6 +574,8 @@ class ReviewBoardServer(object):
     def process_error(self, http_status, data):
         """Processes an error, raising an APIError with the information."""
         try:
+            if six.PY3 and isinstance(data, bytes):
+                data = data.decode('utf-8')
             rsp = json_loads(data)
 
             assert rsp['stat'] == 'fail'

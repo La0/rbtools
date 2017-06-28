@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 import json
+import six
 
 from rbtools.api.utils import parse_mimetype
 
@@ -26,6 +27,8 @@ DEFAULT_DECODER = DefaultDecoder
 
 
 def JsonDecoder(payload):
+    if six.PY3 and isinstance(payload, bytes):
+        payload = payload.decode('utf-8')
     return json.loads(payload)
 
 
