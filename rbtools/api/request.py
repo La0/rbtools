@@ -406,6 +406,7 @@ class ReviewBoardServer(object):
                  api_token=None, agent=None, session=None, disable_proxy=False,
                  auth_callback=None, otp_token_callback=None,
                  verify_ssl=True, save_cookies=True, ext_auth_cookies=None):
+        assert isinstance(url, str)
         if not url.endswith('/'):
             url += '/'
 
@@ -548,6 +549,8 @@ class ReviewBoardServer(object):
     def process_error(self, http_status, data):
         """Processes an error, raising an APIError with the information."""
         try:
+            if six.PY3 and isinstance(data, bytes):
+                data = data.decode('utf-8')
             rsp = json_loads(data)
 
             assert rsp['stat'] == 'fail'
@@ -568,6 +571,14 @@ class ReviewBoardServer(object):
         The request argument should be an instance of
         'rbtools.api.request.HttpRequest'.
         """
+        def _cleanup_encoding(x):
+            # Support both Python 2 & 3 encodings
+            if six.PY3 and isinstance(x, bytes):
+                x = x.decode('utf-8')
+            elif six.PY2:
+                x = x.encode('utf-8')
+            return x
+
         try:
             content_type, body = request.encode_multipart_formdata()
             headers = request.headers
@@ -580,8 +591,14 @@ class ReviewBoardServer(object):
             else:
                 headers[b'Content-Length'] = '0'
 
-            r = Request(request.url.encode('utf-8'), body, headers,
-                        request.method.encode('utf-8'))
+            url = _cleanup_encoding(request.url)
+            method = _cleanup_encoding(request.method)
+            headers = dict(map(
+                lambda x: (_cleanup_encoding(x[0]), _cleanup_encoding(x[1])),
+                headers.items()
+            ))
+
+            r = Request(url, body, headers, method)
             rsp = self._urlopen(r)
         except HTTPError as e:
             self.process_error(e.code, e.read())
